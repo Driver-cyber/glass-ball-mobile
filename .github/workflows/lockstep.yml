@@ -1,0 +1,28 @@
+# Schema lockstep guard: this repo and glass-ball (desktop/main) read/write
+# the same synced db. The suite lives in the main repo; this job clones it
+# and points the suite at this checkout as the mobile side.
+name: lockstep
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  lockstep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Clone the main sibling (carries the suite; same-named branch when it exists, else main)
+        run: |
+          REPO=https://github.com/Driver-cyber/glass-ball.git
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          git clone --depth 1 --branch "$BRANCH" "$REPO" ../glass-ball \
+            || git clone --depth 1 "$REPO" ../glass-ball
+      - name: Run the lockstep suite against this checkout
+        env:
+          GB_DESKTOP: ${{ github.workspace }}/../glass-ball
+          GB_MOBILE: ${{ github.workspace }}
+        run: cd ../glass-ball && npm test
